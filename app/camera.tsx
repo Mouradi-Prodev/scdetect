@@ -1,14 +1,14 @@
 import { Camera, CameraType, FlashMode } from 'expo-camera';
 import { useState, useRef, useEffect } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Image,ImageURISource } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import React from 'react';
+import { ExpoWebGLRenderingContext } from 'expo-gl';
 import * as tf from '@tensorflow/tfjs';
-import '@tensorflow/tfjs-backend-cpu';
-import '@tensorflow/tfjs-backend-webgl';
+import '@tensorflow/tfjs-react-native';
 
-
-
+import * as ImageManipulator from 'expo-image-manipulator';
+import { SaveFormat } from 'expo-image-manipulator';
 
 
 
@@ -17,16 +17,29 @@ interface DataItem {
     prediction: any;
 }
 export default function App() {
+    const [tfReady,setTfReady] = useState(false);
+    useEffect(()=>{
+        const prepare = async () =>{
+            await tf.ready();
+            setTfReady(true);
+        }
+        prepare();
+    })
+
     const loadModel = async () => {
-        await tf.setBackend('webgl');
+        //await tf.setBackend('webgl');
         let model = await tf.loadLayersModel('../assets/model/model.json');
         return model;
     }
 
 
-    let loadedModel = useRef(null);
+    const [model,setModel] = useState<tf.LayersModel>();
     useEffect(() => {
-        loadedModel.current = loadModel();
+        const set = async ()=>{
+            setModel(await loadModel());
+        }
+        
+        
     }, []);
     const IMAGE_SIZE = 28;
     const LARGE_IMAGE_SIZE = 104;
@@ -40,37 +53,43 @@ export default function App() {
         'mel'
     ]
     const predict = async (img: any, model: any) => {
-        const cropTo = (input: any, focalSize: any) => {
-            let canvas = document.createElement('canvas');
-            let width = input.width;
-            let height = input.height;
-            canvas.width = width; canvas.height = focalSize;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(
-                input,
-                Math.floor(width / 2) - Math.floor(focalSize / 2),
-                Math.floor(height / 2) - Math.floor(focalSize / 2),
-                focalSize, focalSize,
-                0, 0, focalSize, focalSize
-            );
-            return canvas;
-        }
-        const resizeTo = (largeCanvas: any, size: any) => {
-            let canvas = document.createElement('canvas');
-            canvas.width = canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(
-                largeCanvas, 0, 0, size, size
-            );
-            return canvas;
-        };
+        const cropTo = async (inputUri:any, focalSize:any) => {
+            try {
+                const croppedImage = await ImageManipulator.manipulateAsync(
+                    inputUri,
+                    [{ crop: { originX: 0.5, originY: 0.5, width: focalSize, height: focalSize } }],
+                    { compress: 1, format: SaveFormat.JPEG, base64: false }
+                  );
+              
+                  return croppedImage.uri;
+            } catch (error) {
+              console.error('Error cropping image:', error);
+              throw error;
+            }
+          };
+          const resizeTo = async (inputUri:any, size:any) => {
+            try {
+              const resizedImage = await ImageManipulator.manipulateAsync(
+                inputUri,
+                [{ resize: { width: size, height: size } }],
+                { compress: 1, format: SaveFormat.JPEG, base64: false }
+              );
+          
+              return resizedImage.uri;
+            } catch (error) {
+              console.error('Error resizing image:', error);
+              throw error;
+            }
+          };
         let croppedImage;
         let scaledImage;
         const image = tf.tidy(() => {
             let pixelRatio = window.devicePixelRatio;
             croppedImage = cropTo(img, LARGE_IMAGE_SIZE * pixelRatio);
             scaledImage = resizeTo(croppedImage, IMAGE_SIZE);
-            const pixels = tf.browser.fromPixels(scaledImage);
+            
+            const { width, height } = Image.resolveAssetSource({ scaledImage });
+            const pixels = tf.browser.fromPixels();
 
             const batchedImage = pixels.expandDims(0);
             // Normalize the image between -1 and 1.
@@ -133,8 +152,8 @@ export default function App() {
         // Handle continuing with the captured image as needed
         // For example, you can navigate to a new screen or perform some other action
         console.log('Continuing with the captured image:', capturedImage);
-        loadedModel?.current?.then((model: any) => {
-            const estimate = async () => {
+        
+            const estimate = async (model:any) => {
                 let { results, croppedImage } = await predict(capturedImage, model);
                 let data: DataItem[] = Array.from(results).map((r: any, i) => {
                     return {
@@ -145,8 +164,10 @@ export default function App() {
                 //set state
                 setData(data);
             };
-            estimate();
-        });
+             estimate(model);
+            
+        
+        console.log("hello");
     }
 
     return (
