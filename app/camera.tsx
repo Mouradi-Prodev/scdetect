@@ -88,13 +88,13 @@ export default function App() {
             croppedImage = cropTo(img, LARGE_IMAGE_SIZE * pixelRatio);
             scaledImage = resizeTo(croppedImage, IMAGE_SIZE);
             
-            const { width, height } = Image.resolveAssetSource({ scaledImage });
-            const pixels = tf.browser.fromPixels();
+            // const { width, height } = Image.resolveAssetSource({ scaledImage });
+            // const pixels = tf.browser.fromPixels();
 
-            const batchedImage = pixels.expandDims(0);
+            //const batchedImage = pixels.expandDims(0);
             // Normalize the image between -1 and 1.
-            const normalizedImage = batchedImage.toFloat().div(tf.scalar(255));
-            return normalizedImage;
+           // const normalizedImage = batchedImage.toFloat().div(tf.scalar(255));
+           // return normalizedImage;
         });
         const prediction = model.predict(image);
         const results = await prediction.data();
