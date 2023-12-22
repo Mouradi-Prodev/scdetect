@@ -30,13 +30,8 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera."
-        }
-      ]
+      "expo-router", "expo-camera","expo-media-library"
+      
     ],
     "experiments": {
       "typedRoutes": true
